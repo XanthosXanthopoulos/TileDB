@@ -34,6 +34,10 @@
 #include "tiledb/common/scoped_executor.h"
 #include "tiledb/sm/tile/tile.h"
 
+#ifndef TILEDB_WEBP
+#define TILEDB_WEBP
+#endif
+
 namespace tiledb::sm {
 void WebpFilter::dump(FILE* out) const {
   if (out == nullptr)
@@ -123,8 +127,9 @@ Status WebpFilter::run_forward(
   throw_if_not_ok(output_metadata->prepend_buffer(metadata_size));
   throw_if_not_ok(output_metadata->write(&num_parts, sizeof(uint32_t)));
 
-  int extent_y = extents_.first, extent_x = extents_.second,
-      pixel_depth = format_ < WebpInputFormat::WEBP_RGBA ? 3 : 4;
+  int height = std::get<0>(extents_), width = std::get<1>(extents_),
+      pixel_depth = std::get<2>(extents_);
+
   for (const auto& i : input_parts) {
     auto data = static_cast<const uint8_t*>(i.data());
     // Number of bytes encoded; Encoded result data buffer.
@@ -141,57 +146,37 @@ Status WebpFilter::run_forward(
       case WebpInputFormat::WEBP_RGB:
         if (lossless_) {
           enc_size = WebPEncodeLosslessRGB(
-              data, extent_x / pixel_depth, extent_y, extent_x, &result);
+              data, width, height, width * pixel_depth, &result);
         } else {
           enc_size = WebPEncodeRGB(
-              data,
-              extent_x / pixel_depth,
-              extent_y,
-              extent_x,
-              quality_,
-              &result);
+              data, width, height, width * pixel_depth, quality_, &result);
         }
         break;
       case WebpInputFormat::WEBP_RGBA:
         if (lossless_) {
           enc_size = WebPEncodeLosslessRGBA(
-              data, extent_x / pixel_depth, extent_y, extent_x, &result);
+              data, width, height, width * pixel_depth, &result);
         } else {
           enc_size = WebPEncodeRGBA(
-              data,
-              extent_x / pixel_depth,
-              extent_y,
-              extent_x,
-              quality_,
-              &result);
+              data, width, height, width * pixel_depth, quality_, &result);
         }
         break;
       case WebpInputFormat::WEBP_BGR:
         if (lossless_) {
           enc_size = WebPEncodeLosslessBGR(
-              data, extent_x / pixel_depth, extent_y, extent_x, &result);
+              data, width, height, width * pixel_depth, &result);
         } else {
           enc_size = WebPEncodeBGR(
-              data,
-              extent_x / pixel_depth,
-              extent_y,
-              extent_x,
-              quality_,
-              &result);
+              data, width, height, width * pixel_depth, quality_, &result);
         }
         break;
       case WebpInputFormat::WEBP_BGRA:
         if (lossless_) {
           enc_size = WebPEncodeLosslessBGRA(
-              data, extent_x / pixel_depth, extent_y, extent_x, &result);
+              data, width, height, width * pixel_depth, &result);
         } else {
           enc_size = WebPEncodeBGRA(
-              data,
-              extent_x / pixel_depth,
-              extent_y,
-              extent_x,
-              quality_,
-              &result);
+              data, width, height, width * pixel_depth, quality_, &result);
         }
         break;
       case WebpInputFormat::WEBP_NONE:
@@ -355,33 +340,44 @@ Status WebpFilter::get_option_impl(FilterOption option, void* value) const {
       quality_,
       format_,
       lossless_,
-      extents_.first,
-      extents_.second,
+      std::get<0>(extents_),
+      std::get<1>(extents_),
+      std::get<2>(extents_),
       filter_data_type_);
 }
 
 void WebpFilter::serialize_impl(Serializer& serializer) const {
   FilterConfig filter_config{
-      quality_, format_, lossless_, extents_.first, extents_.second};
+      quality_,
+      format_,
+      lossless_,
+      std::get<0>(extents_),
+      std::get<1>(extents_),
+      std::get<2>(extents_)};
   serializer.write(filter_config);
 }
 
 template <typename T>
 void WebpFilter::set_extents(const std::vector<ByteVecValue>& extents) {
-  extents_ = {extents[0].rvalue_as<T>(), extents[1].rvalue_as<T>()};
+  extents_ = std::make_tuple(
+      extents[0].rvalue_as<T>(),
+      extents[1].rvalue_as<T>(),
+      extents[2].rvalue_as<T>());
   uint8_t pixel_depth = format_ < WebpInputFormat::WEBP_RGBA ? 3 : 4;
   // X should be divisible by pixel_depth or RGB values will skew.
-  if (extents_.second % pixel_depth != 0) {
+
+  if (std::get<2>(extents_) != pixel_depth) {
     throw StatusException(Status_FilterError(
         pixel_depth == 3 ?
             "Colorspace with no alpha must use extents divisible by 3" :
             "Colorspace with alpha must use extents divisible by 4"));
   }
-  if (extents_.first > 16383 || (extents_.second / pixel_depth) > 16383) {
+  if (std::get<0>(extents_) > 16383 || std::get<1>(extents_) > 16383) {
     throw StatusException(Status_FilterError(
         "Tile extents too large; Max size WebP image is 16383x16383 pixels"));
   }
-  WriterTile::set_max_tile_chunk_size(extents_.first * extents_.second);
+  WriterTile::set_max_tile_chunk_size(
+      std::get<0>(extents_) * std::get<1>(extents_) * std::get<2>(extents_));
 }
 
 template void WebpFilter::set_extents<uint8_t>(

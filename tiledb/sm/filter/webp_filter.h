@@ -99,7 +99,7 @@ class WebpFilter : public Filter {
     float quality;
     WebpInputFormat format;
     bool lossless;
-    uint16_t y_extent, x_extent;
+    uint16_t x_extent, y_extent, z_extent;
   };
 
   /* ********************************* */
@@ -115,7 +115,13 @@ class WebpFilter : public Filter {
    */
   WebpFilter(Datatype filter_data_type)
       : WebpFilter(
-            100.0f, WebpInputFormat::WEBP_NONE, false, 0, 0, filter_data_type) {
+            100.0f,
+            WebpInputFormat::WEBP_NONE,
+            false,
+            0,
+            0,
+            0,
+            filter_data_type) {
   }
 
   /**
@@ -124,22 +130,24 @@ class WebpFilter : public Filter {
    * @param quality Quality factor to use for WebP lossy compression.
    * @param inputFormat Colorspace format to use for WebP compression.
    * @param lossless Enable lossless compression.
-   * @param y_extent Extent at dimension index 0.
-   * @param x_extent Extent at dimension index 1.
+   * @param x_extent Extent at dimension index 0.
+   * @param y_extent Extent at dimension index 1.
+   * @param z_extent Extent at dimension index 2.
    * @param filter_data_type Datatype the filter will operate on.
    */
   WebpFilter(
       float quality,
       WebpInputFormat inputFormat,
       bool lossless,
-      uint16_t y_extent,
       uint16_t x_extent,
+      uint16_t y_extent,
+      uint16_t z_extent,
       Datatype filter_data_type)
       : Filter(FilterType::FILTER_WEBP, filter_data_type)
       , quality_(quality)
       , format_(inputFormat)
       , lossless_(lossless)
-      , extents_({y_extent, x_extent}) {
+      , extents_({x_extent, y_extent, z_extent}) {
   }
 
   /* ****************************** */
@@ -274,7 +282,7 @@ class WebpFilter : public Filter {
    *
    * @return Copy of extents_ private member
    */
-  inline std::pair<uint16_t, uint16_t> get_extents() const {
+  inline std::tuple<uint16_t, uint16_t, uint16_t> get_extents() const {
     return extents_;
   }
 
@@ -288,7 +296,7 @@ class WebpFilter : public Filter {
   bool lossless_;
 
   /** Extents stored in smallest type able to hold WebP image max dimensions */
-  std::pair<uint16_t, uint16_t> extents_;
+  std::tuple<uint16_t, uint16_t, uint16_t> extents_;
 
   /* ********************************* */
   /*           PRIVATE METHODS         */
