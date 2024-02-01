@@ -36,6 +36,7 @@
 #include <test/support/tdb_catch.h>
 #include <algorithm>
 #include <optional>
+#include <numeric>
 #include "tiledb/sm/tile/tile.h"
 
 using namespace tiledb::common;
