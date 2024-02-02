@@ -212,10 +212,9 @@ void create_array(
   Domain domain(ctx);
   // We use `width * 4` for X dimension to allow RGBA (4) elements per-pixel.
   domain
-      .add_dimension(
-          Dimension::create<unsigned>(ctx, "y", {{1, height}}, height / 2))
-      .add_dimension(Dimension::create<unsigned>(
-          ctx, "x", {{1, width * pixel_depth}}, (width / 2) * pixel_depth));
+      .add_dimension(Dimension::create<unsigned>(ctx, "y", {{1, height}}, height / 2))
+      .add_dimension(Dimension::create<unsigned>(ctx, "x", {{1, width}}, width / 2))
+      .add_dimension(Dimension::create<unsigned>(ctx, "z", {{1, pixel_depth}}, pixel_depth));
 
   // To compress using webp we need RGBA in a single buffer.
   ArraySchema schema(ctx, TILEDB_DENSE);
