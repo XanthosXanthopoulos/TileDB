@@ -334,6 +334,8 @@ struct WebpConfig {
   # Tile extent along X axis.
   extentY @4: UInt16;
   # Tile extent along Y axis.
+  extentY @5: UInt16;
+  # Tile extent along Y axis.
 }
 
 struct Filter {

@@ -4539,6 +4539,8 @@ class WebpConfig::Reader {
 
   inline ::uint16_t getExtentY() const;
 
+  inline ::uint16_t getExtentZ() const;
+
  private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -4592,6 +4594,9 @@ class WebpConfig::Builder {
 
   inline ::uint16_t getExtentY();
   inline void setExtentY(::uint16_t value);
+
+  inline ::uint16_t getExtentZ();
+  inline void setExtentZ(::uint16_t value);
 
  private:
   ::capnp::_::StructBuilder _builder;
@@ -20055,6 +20060,20 @@ inline ::uint16_t WebpConfig::Builder::getExtentY() {
 inline void WebpConfig::Builder::setExtentY(::uint16_t value) {
   _builder.setDataField<::uint16_t>(
       ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+}
+
+inline ::uint16_t WebpConfig::Reader::getExtentZ() const {
+  return _reader.getDataField<::uint16_t>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+
+inline ::uint16_t WebpConfig::Builder::getExtentZ() {
+  return _builder.getDataField<::uint16_t>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+inline void WebpConfig::Builder::setExtentZ(::uint16_t value) {
+  _builder.setDataField<::uint16_t>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool Filter::Reader::hasType() const {

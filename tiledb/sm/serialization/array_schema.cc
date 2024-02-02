@@ -149,8 +149,9 @@ Status filter_to_capnp(
       webpConfig.setQuality(quality);
       webpConfig.setFormat(static_cast<uint8_t>(format));
       webpConfig.setLossless(lossless);
-      webpConfig.setExtentX(extents.first);
-      webpConfig.setExtentY(extents.second);
+      webpConfig.setExtentX(std::get<0>(extents));
+      webpConfig.setExtentY(std::get<1>(extents));
+      webpConfig.setExtentZ(std::get<2>(extents));
       break;
     }
     case FilterType::FILTER_NONE:
@@ -295,6 +296,7 @@ tuple<Status, optional<shared_ptr<Filter>>> filter_from_capnp(
           bool lossless = webpConfig.getLossless();
           uint16_t extent_x = webpConfig.getExtentX();
           uint16_t extent_y = webpConfig.getExtentY();
+          uint16_t extent_z = webpConfig.getExtentZ();
           return {
               Status::Ok(),
               tiledb::common::make_shared<WebpFilter>(
@@ -304,6 +306,7 @@ tuple<Status, optional<shared_ptr<Filter>>> filter_from_capnp(
                   lossless,
                   extent_x,
                   extent_y,
+                  extent_z,
                   datatype)};
         } else {
           return {
