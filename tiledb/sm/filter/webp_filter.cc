@@ -34,10 +34,6 @@
 #include "tiledb/common/scoped_executor.h"
 #include "tiledb/sm/tile/tile.h"
 
-#ifndef TILEDB_WEBP
-#define TILEDB_WEBP
-#endif
-
 namespace tiledb::sm {
 void WebpFilter::dump(FILE* out) const {
   if (out == nullptr)
