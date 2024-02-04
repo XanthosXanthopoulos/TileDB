@@ -359,19 +359,21 @@ void WebpFilter::serialize_impl(Serializer& serializer) const {
 
 template <typename T>
 void WebpFilter::set_extents(const std::vector<ByteVecValue>& extents) {
-  extents_ = std::make_tuple(
-      extents[0].rvalue_as<T>(),
-      extents[1].rvalue_as<T>(),
-      extents[2].rvalue_as<T>());
   uint8_t pixel_depth = format_ < WebpInputFormat::WEBP_RGBA ? 3 : 4;
-  // X should be divisible by pixel_depth or RGB values will skew.
-
-  if (std::get<2>(extents_) != pixel_depth) {
+  if ((extents.size() == 2 && extents[1].rvalue_as<T>() % pixel_depth != 0) ||
+      (extents.size() == 3 && extents[2].rvalue_as<T>() != pixel_depth)) {
     throw StatusException(Status_FilterError(
         pixel_depth == 3 ?
             "Colorspace with no alpha must use extents divisible by 3" :
             "Colorspace with alpha must use extents divisible by 4"));
   }
+
+  extents_ = std::make_tuple(
+      extents[0].rvalue_as<T>(),
+      extents.size() == 3 ? extents[1].rvalue_as<T>() :
+                            extents[1].rvalue_as<T>() / pixel_depth,
+      extents.size() == 3 ? extents[2].rvalue_as<T>() : pixel_depth);
+
   if (std::get<0>(extents_) > 16383 || std::get<1>(extents_) > 16383) {
     throw StatusException(Status_FilterError(
         "Tile extents too large; Max size WebP image is 16383x16383 pixels"));
