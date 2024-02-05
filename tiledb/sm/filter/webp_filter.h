@@ -274,7 +274,7 @@ class WebpFilter : public Filter {
    *
    * @return Copy of extents_ private member
    */
-  inline std::pair<uint16_t, uint16_t> get_extents() const {
+  inline std::tuple<uint16_t, uint16_t> get_extents() const {
     return extents_;
   }
 
@@ -288,7 +288,7 @@ class WebpFilter : public Filter {
   bool lossless_;
 
   /** Extents stored in smallest type able to hold WebP image max dimensions */
-  std::pair<uint16_t, uint16_t> extents_;
+  std::tuple<uint16_t, uint16_t> extents_;
 
   /* ********************************* */
   /*           PRIVATE METHODS         */

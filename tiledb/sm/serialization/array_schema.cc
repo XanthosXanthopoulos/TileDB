@@ -149,8 +149,8 @@ Status filter_to_capnp(
       webpConfig.setQuality(quality);
       webpConfig.setFormat(static_cast<uint8_t>(format));
       webpConfig.setLossless(lossless);
-      webpConfig.setExtentX(extents.first);
-      webpConfig.setExtentY(extents.second);
+      webpConfig.setExtentX(std::get<0>(extents));
+      webpConfig.setExtentY(std::get<1>(extents));
       break;
     }
     case FilterType::FILTER_NONE:

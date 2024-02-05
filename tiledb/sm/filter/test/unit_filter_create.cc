@@ -484,7 +484,7 @@ TEST_CASE("Filter: Test WEBP filter deserialization", "[filter][webp]") {
     CHECK(lossless0 == lossless1);
 
     auto extents = dynamic_cast<WebpFilter*>(filter.get())->get_extents();
-    CHECK(y0 == extents.first);
-    CHECK(x0 == extents.second);
+    CHECK(y0 == std::get<0>(extents));
+    CHECK(x0 == std::get<1>(extents));
   }
 }

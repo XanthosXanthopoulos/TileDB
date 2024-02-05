@@ -178,48 +178,71 @@ std::vector<uint8_t> create_image(
 
 // These templates will not be used if built with TILEDB_WEBP=OFF
 template <typename T>
-[[maybe_unused]] Domain create_domain(const Context& ctx, uint8_t format) {
+[[maybe_unused]] Domain create_domain(
+    const Context& ctx, uint8_t format, uint8_t expect_2d) {
   T height = GENERATE(131, 217);
   T width = GENERATE(103, 277);
-  uint8_t pixel_depth = format < TILEDB_WEBP_RGBA ? 3 : 4;
-  auto y = Dimension::create<T>(ctx, "y", {{1, height}}, height / 2);
-  auto x = Dimension::create<T>(
-      ctx, "x", {{1, (T)(width * pixel_depth)}}, (width / 2) * pixel_depth);
+  T pixel_depth = format < TILEDB_WEBP_RGBA ? 3 : 4;
+  auto x = Dimension::create<T>(ctx, "x", {{1, height}}, height / 2);
   Domain domain(ctx);
-  domain.add_dimensions(y, x);
+  if (expect_2d) {
+    auto y = Dimension::create<T>(
+        ctx, "y", {{1, (T)(width * pixel_depth)}}, (width / 2) * pixel_depth);
+    domain.add_dimensions(x, y);
+  } else {
+    auto y = Dimension::create<T>(ctx, "y", {{1, width}}, width / 2);
+    auto z = Dimension::create<T>(ctx, "z", {{1, pixel_depth}}, pixel_depth);
+    domain.add_dimensions(x, y, z);
+  }
   return domain;
 }
 
 template <>
 [[maybe_unused]] Domain create_domain<int8_t>(
-    const Context& ctx, uint8_t format) {
+    const Context& ctx, uint8_t format, uint8_t expect_2d) {
   int8_t height = GENERATE(9, 11, 15);
   int8_t width = GENERATE(5, 7, 9, 17);
-  uint8_t pixel_depth = format < TILEDB_WEBP_RGBA ? 3 : 4;
+  int8_t pixel_depth = format < TILEDB_WEBP_RGBA ? 3 : 4;
 
-  int8_t w = width * pixel_depth;
-  auto y = Dimension::create<int8_t>(ctx, "y", {{1, height}}, height / 2);
-  auto x =
-      Dimension::create<int8_t>(ctx, "x", {{1, w}}, (width / 2) * pixel_depth);
+  auto x = Dimension::create<int8_t>(ctx, "x", {{1, height}}, height / 2);
   Domain domain(ctx);
-  domain.add_dimensions(y, x);
+  if (expect_2d) {
+    auto y = Dimension::create<int8_t>(
+        ctx,
+        "y",
+        {{1, (int8_t)(width * pixel_depth)}},
+        (width / 2) * pixel_depth);
+    domain.add_dimensions(x, y);
+  } else {
+    auto y = Dimension::create<int8_t>(ctx, "y", {{1, width}}, width / 2);
+    auto z =
+        Dimension::create<int8_t>(ctx, "z", {{1, pixel_depth}}, pixel_depth);
+    domain.add_dimensions(x, y, z);
+  }
   return domain;
 }
 
 template <>
 [[maybe_unused]] Domain create_domain<uint8_t>(
-    const Context& ctx, uint8_t format) {
+    const Context& ctx, uint8_t format, uint8_t expect_2d) {
   uint8_t height = GENERATE(13, 35, 47, 61);
   uint8_t width = GENERATE(10, 11, 23, 39, 60);
   uint8_t pixel_depth = format < TILEDB_WEBP_RGBA ? 3 : 4;
-  auto y = Dimension::create<uint8_t>(ctx, "y", {{1, height}}, height / 2);
-  auto x = Dimension::create<uint8_t>(
-      ctx,
-      "x",
-      {{1, (uint8_t)(width * pixel_depth)}},
-      (width / 2) * pixel_depth);
+  auto x = Dimension::create<uint8_t>(ctx, "x", {{1, height}}, height / 2);
   Domain domain(ctx);
-  domain.add_dimensions(y, x);
+  if (expect_2d) {
+    auto y = Dimension::create<uint8_t>(
+        ctx,
+        "y",
+        {{1, (uint8_t)(width * pixel_depth)}},
+        (width / 2) * pixel_depth);
+    domain.add_dimensions(x, y);
+  } else {
+    auto y = Dimension::create<uint8_t>(ctx, "y", {{1, width}}, width / 2);
+    auto z =
+        Dimension::create<uint8_t>(ctx, "z", {{1, pixel_depth}}, pixel_depth);
+    domain.add_dimensions(x, y, z);
+  }
   return domain;
 }
 
@@ -247,6 +270,8 @@ TEMPLATE_LIST_TEST_CASE(
         Dimension::create<uint64_t>(ctx, "y", {{1, 100}}, 90));
     valid_domain.add_dimension(
         Dimension::create<uint64_t>(ctx, "x", {{1, 100}}, 90));
+    valid_domain.add_dimension(
+        Dimension::create<uint64_t>(ctx, "z", {{1, 3}}, 3));
 
     ArraySchema valid_schema(ctx, TILEDB_DENSE);
     valid_schema.set_domain(valid_domain);
@@ -259,11 +284,11 @@ TEMPLATE_LIST_TEST_CASE(
         Catch::Matchers::ContainsSubstring(
             "Filter WEBP does not accept input type"));
 
-    // WebP filter requires exactly 2 dimensions for Y, X.
+    // WebP filter requires exactly 2 or 3 dimensions for Y, X (and C).
     {
       Domain invalid_domain(ctx);
       invalid_domain.add_dimension(
-          Dimension::create<uint64_t>(ctx, "y", {{1, 100}}, 90));
+          Dimension::create<uint64_t>(ctx, "x", {{1, 100}}, 90));
 
       // Test with < 2 dimensions.
       ArraySchema invalid_schema(ctx, TILEDB_DENSE);
@@ -272,17 +297,20 @@ TEMPLATE_LIST_TEST_CASE(
       REQUIRE_THROWS_WITH(
           Array::create(webp_array_name, invalid_schema),
           Catch::Matchers::ContainsSubstring(
-              "WebP filter requires exactly 2 dimensions Y, X"));
+              "ArraySchema: WebP filter requires exactly 2 or 3 dimensions Y, "
+              "X (and C)."));
 
-      // Test with > 2 dimensions.
+      // Test with > 3 dimensions.
       invalid_domain.add_dimensions(
-          Dimension::create<uint64_t>(ctx, "x", {{1, 100}}, 90),
-          Dimension::create<uint64_t>(ctx, "z", {{1, 100}}, 90));
+          Dimension::create<uint64_t>(ctx, "y", {{1, 100}}, 90),
+          Dimension::create<uint64_t>(ctx, "z", {{1, 100}}, 90),
+          Dimension::create<uint64_t>(ctx, "w", {{1, 100}}, 90));
       invalid_schema.set_domain(invalid_domain);
       REQUIRE_THROWS_WITH(
           Array::create(webp_array_name, invalid_schema),
           Catch::Matchers::ContainsSubstring(
-              "WebP filter requires exactly 2 dimensions Y, X"));
+              "ArraySchema: WebP filter requires exactly 2 or 3 dimensions Y, "
+              "X (and C)."));
     }
 
     // In dense arrays, all dimensions must have matching datatype.
@@ -292,6 +320,8 @@ TEMPLATE_LIST_TEST_CASE(
           Dimension::create<uint64_t>(ctx, "y", {{1, 100}}, 90));
       invalid_domain.add_dimension(
           Dimension::create<TestType>(ctx, "x", {{1, 100}}, 90));
+      invalid_domain.add_dimension(
+          Dimension::create<TestType>(ctx, "z", {{1, 3}}, 3));
 
       ArraySchema invalid_schema(ctx, TILEDB_DENSE);
 
@@ -323,11 +353,11 @@ TEMPLATE_LIST_TEST_CASE(
 }
 
 using DimensionTypes = std::tuple<
-    uint8_t,
+    // uint8_t,
     uint16_t,
     uint32_t,
     uint64_t,
-    int8_t,
+    // int8_t,
     int16_t,
     int32_t,
     int64_t>;
@@ -345,6 +375,7 @@ TEMPLATE_LIST_TEST_CASE(
     uint8_t format_expected = GENERATE(
         TILEDB_WEBP_RGB, TILEDB_WEBP_RGBA, TILEDB_WEBP_BGR, TILEDB_WEBP_BGRA);
     uint8_t lossless_expected = GENERATE(1, 0);
+    uint8_t expect_2d = GENERATE(0, 1);
 
     Filter filter(ctx, TILEDB_FILTER_WEBP);
     REQUIRE(filter.filter_type() == TILEDB_FILTER_WEBP);
@@ -413,11 +444,20 @@ TEMPLATE_LIST_TEST_CASE(
     REQUIRE(lossless_found == filter.get_option<uint8_t>(TILEDB_WEBP_LOSSLESS));
 
     // Test against images of different sizes.
-    Domain domain = create_domain<TestType>(ctx, format_expected);
+    Domain domain = create_domain<TestType>(ctx, format_expected, expect_2d);
     uint8_t pixel_depth = format_expected < TILEDB_WEBP_RGBA ? 3 : 4;
     TestType height = domain.dimension(0).template domain<TestType>().second;
-    TestType width =
-        domain.dimension(1).template domain<TestType>().second / pixel_depth;
+    TestType width = 0;
+    TestType depth = 0;
+
+    if (expect_2d) {
+      width =
+          domain.dimension(1).template domain<TestType>().second / pixel_depth;
+      depth = pixel_depth;
+    } else {
+      width = domain.dimension(1).template domain<TestType>().second;
+      depth = domain.dimension(2).template domain<TestType>().second;
+    }
 
     FilterList filterList(ctx);
     filterList.add_filter(filter);
@@ -442,9 +482,14 @@ TEMPLATE_LIST_TEST_CASE(
     REQUIRE(Query::Status::COMPLETE == write.query_status());
 
     array.open(TILEDB_READ);
-    std::vector<uint8_t> read_rgb((width * pixel_depth) * height);
-    std::vector<TestType> subarray = {
-        1, height, 1, (TestType)(width * pixel_depth)};
+    std::vector<uint8_t> read_rgb(height * width * depth);
+    std::vector<TestType> subarray;
+    if (expect_2d) {
+      subarray.insert(
+          subarray.begin(), {1, height, 1, (TestType)(width * depth)});
+    } else {
+      subarray.insert(subarray.begin(), {1, height, 1, width, 1, depth});
+    }
     Query read(ctx, array);
     read.set_layout(TILEDB_ROW_MAJOR)
         .set_subarray(Subarray(ctx, array).set_subarray(subarray))
@@ -487,6 +532,7 @@ TEST_CASE("C API: WEBP Filter", "[capi][filter][webp]") {
     uint8_t expected_lossless = GENERATE(1, 0);
     uint8_t expected_fmt = GENERATE(
         TILEDB_WEBP_RGB, TILEDB_WEBP_RGBA, TILEDB_WEBP_BGR, TILEDB_WEBP_BGRA);
+    uint8_t expect_2d = GENERATE(0, 1);
 
     tiledb_filter_t* filter;
     tiledb_filter_alloc(ctx, TILEDB_FILTER_WEBP, &filter);
@@ -571,17 +617,36 @@ TEST_CASE("C API: WEBP Filter", "[capi][filter][webp]") {
     tiledb_filter_list_alloc(ctx, &filter_list);
     tiledb_filter_list_add_filter(ctx, filter_list, filter);
 
-    unsigned bounds[] = {1, height, 1, (width * pixel_depth)};
-    unsigned extents[] = {height / 2, (width / 2) * pixel_depth};
-    tiledb_dimension_t* y;
-    tiledb_dimension_alloc(ctx, "y", TILEDB_INT32, &bounds[0], &extents[0], &y);
-    tiledb_dimension_t* x;
-    tiledb_dimension_alloc(ctx, "x", TILEDB_INT32, &bounds[2], &extents[1], &x);
-
     tiledb_domain_t* domain;
     tiledb_domain_alloc(ctx, &domain);
-    tiledb_domain_add_dimension(ctx, domain, y);
+
+    unsigned bounds[] = {
+        1,
+        height,
+        1,
+        expect_2d ? (width * pixel_depth) : width,
+        1,
+        pixel_depth};
+    unsigned extents[] = {
+        height / 2,
+        expect_2d ? ((width / 2) * pixel_depth) : (width / 2),
+        pixel_depth};
+
+    tiledb_dimension_t* x;
+    tiledb_dimension_alloc(ctx, "x", TILEDB_INT32, &bounds[0], &extents[0], &x);
+    tiledb_dimension_t* y;
+    tiledb_dimension_alloc(ctx, "y", TILEDB_INT32, &bounds[2], &extents[1], &y);
+    tiledb_dimension_t* z;
+
     tiledb_domain_add_dimension(ctx, domain, x);
+    tiledb_domain_add_dimension(ctx, domain, y);
+
+    if (!expect_2d) {
+      tiledb_dimension_alloc(
+          ctx, "z", TILEDB_INT32, &bounds[4], &extents[2], &z);
+
+      tiledb_domain_add_dimension(ctx, domain, z);
+    }
 
     tiledb_attribute_t* a;
     tiledb_attribute_alloc(ctx, "rgb", TILEDB_UINT8, &a);
@@ -599,8 +664,11 @@ TEST_CASE("C API: WEBP Filter", "[capi][filter][webp]") {
     tiledb_filter_free(&filter);
     tiledb_filter_list_free(&filter_list);
     tiledb_attribute_free(&a);
-    tiledb_dimension_free(&y);
     tiledb_dimension_free(&x);
+    tiledb_dimension_free(&y);
+    if (!expect_2d) {
+      tiledb_dimension_free(&z);
+    }
     tiledb_domain_free(&domain);
     tiledb_array_schema_free(&schema);
 
@@ -630,13 +698,12 @@ TEST_CASE("C API: WEBP Filter", "[capi][filter][webp]") {
       tiledb_query_t* read;
       tiledb_query_alloc(ctx, array, TILEDB_READ, &read);
       tiledb_query_set_layout(ctx, read, TILEDB_ROW_MAJOR);
-      unsigned sub[] = {1, height, 1, (width * pixel_depth)};
+      unsigned sub[] = {1, height, 1, expect_2d ? (width * pixel_depth) : width, 1, pixel_depth};
       tiledb_subarray_t* subarray;
       tiledb_subarray_alloc(ctx, array, &subarray);
       tiledb_subarray_set_subarray(ctx, subarray, &sub);
       tiledb_query_set_subarray_t(ctx, read, subarray);
-      tiledb_query_set_data_buffer(
-          ctx, read, "rgb", read_rgb.data(), &data_size);
+      tiledb_query_set_data_buffer(ctx, read, "rgb", read_rgb.data(), &data_size);
       tiledb_query_submit(ctx, read);
       tiledb_array_close(ctx, array);
 

@@ -29,6 +29,9 @@
  *
  * This file implements class WebpFilter.
  */
+#ifndef TILEDB_WEBP
+#define TILEDB_WEBP
+#endif
 
 #include "tiledb/sm/filter/webp_filter.h"
 #include "tiledb/common/scoped_executor.h"
@@ -123,7 +126,7 @@ Status WebpFilter::run_forward(
   throw_if_not_ok(output_metadata->prepend_buffer(metadata_size));
   throw_if_not_ok(output_metadata->write(&num_parts, sizeof(uint32_t)));
 
-  int extent_y = extents_.first, extent_x = extents_.second,
+  int extent_y = std::get<0>(extents_), extent_x = std::get<1>(extents_),
       pixel_depth = format_ < WebpInputFormat::WEBP_RGBA ? 3 : 4;
   for (const auto& i : input_parts) {
     auto data = static_cast<const uint8_t*>(i.data());
@@ -355,33 +358,38 @@ Status WebpFilter::get_option_impl(FilterOption option, void* value) const {
       quality_,
       format_,
       lossless_,
-      extents_.first,
-      extents_.second,
+      std::get<0>(extents_),
+      std::get<1>(extents_),
       filter_data_type_);
 }
 
 void WebpFilter::serialize_impl(Serializer& serializer) const {
   FilterConfig filter_config{
-      quality_, format_, lossless_, extents_.first, extents_.second};
+      quality_, format_, lossless_, std::get<0>(extents_), std::get<1>(extents_)};
   serializer.write(filter_config);
 }
 
 template <typename T>
 void WebpFilter::set_extents(const std::vector<ByteVecValue>& extents) {
-  extents_ = {extents[0].rvalue_as<T>(), extents[1].rvalue_as<T>()};
   uint8_t pixel_depth = format_ < WebpInputFormat::WEBP_RGBA ? 3 : 4;
-  // X should be divisible by pixel_depth or RGB values will skew.
-  if (extents_.second % pixel_depth != 0) {
+  if ((extents.size() == 2 && extents[1].rvalue_as<T>() % pixel_depth != 0) ||
+      (extents.size() == 3 && extents[2].rvalue_as<T>() != pixel_depth)) {
     throw StatusException(Status_FilterError(
         pixel_depth == 3 ?
             "Colorspace with no alpha must use extents divisible by 3" :
             "Colorspace with alpha must use extents divisible by 4"));
   }
-  if (extents_.first > 16383 || (extents_.second / pixel_depth) > 16383) {
+
+  extents_ = std::make_tuple(
+      extents[0].rvalue_as<T>(),
+      extents.size() == 3 ? extents[1].rvalue_as<T>() * extents[2].rvalue_as<T>() :
+                            extents[1].rvalue_as<T>());
+
+  if (std::get<0>(extents_) > 16383 || (std::get<1>(extents_) / pixel_depth) > 16383) {
     throw StatusException(Status_FilterError(
         "Tile extents too large; Max size WebP image is 16383x16383 pixels"));
   }
-  WriterTile::set_max_tile_chunk_size(extents_.first * extents_.second);
+  WriterTile::set_max_tile_chunk_size(std::get<0>(extents_) * std::get<1>(extents_));
 }
 
 template void WebpFilter::set_extents<uint8_t>(

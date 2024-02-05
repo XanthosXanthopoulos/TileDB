@@ -370,15 +370,16 @@ void ArraySchema::check_webp_filter() const {
           "WebP filter can only be applied to dense arrays");
     }
 
-    if (dim_map_.size() != 2) {
+    if (dim_map_.size() != 2 && dim_map_.size() != 3) {
       throw ArraySchemaException(
-          "WebP filter requires exactly 2 dimensions Y, X.");
+          "WebP filter requires exactly 2 or 3 dimensions Y, X (and C).");
     }
-    auto y_dim = dimension_ptr(0);
-    auto x_dim = dimension_ptr(1);
-    if (y_dim->type() != x_dim->type()) {
-      throw ArraySchemaException(
-          "WebP filter dimensions 0, 1 should have matching integral types");
+
+    for (size_t index = 1; index < dim_map_.size(); ++index) {
+      if (dimension_ptr(0)->type() != dimension_ptr(index)->type()) {
+        throw ArraySchemaException(
+            "WebP filter dimensions should have matching integral types");
+      }
     }
 
     auto g = [&](auto T) {
@@ -386,10 +387,10 @@ void ArraySchema::check_webp_filter() const {
         webp->set_extents<decltype(T)>(domain_->tile_extents());
       } else {
         throw ArraySchemaException(
-            "WebP filter requires integral dimensions at index 0, 1");
+            "WebP filter requires integral dimensions at index 0, 1 (and 2)");
       }
     };
-    apply_with_type(g, x_dim->type());
+    apply_with_type(g, dimension_ptr(0)->type());
   }
 }
 
